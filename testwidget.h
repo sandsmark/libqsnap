@@ -41,30 +41,30 @@ public:
     void logout();
     void getUpdates(qulonglong timelimit = 0);
     void getStories(qulonglong timelimit = 0);
-    void getStoryBlob(const QByteArray &id, const QByteArray &key, const QByteArray &iv);
+    void getStoryBlob(const QString &id, const QByteArray &key, const QByteArray &iv);
     void getSnap(const QByteArray &id);
     void markViewed(const QByteArray &id, int duration = 1);
     void setPrivacy(Privacy privacy);
-    void changeRelationship(const QByteArray &username, UserAction userAction);
-    void sendSnap(const QByteArray &fileData, QList<QByteArray> recipients, int time = 5);
+    void changeRelationship(const QString &username, UserAction userAction);
+    void sendSnap(const QByteArray &fileData, QList<QString> recipients, int time = 5);
 
 signals:
     void loginFailed();
     void logoutFailed();
 
     void writeFileFailed();
-    void storedStoryBlob(QByteArray id);
-    void storedSnap(QByteArray id);
-    void markedViewed(QByteArray id);
+    void storedStoryBlob(QString id);
+    void storedSnap(QString id);
+    void markedViewed(QString id);
 
     void privacyChanged(Privacy privacy);
 
-    void friendAdded(QByteArray username);
-    void userNotFound(QByteArray username);
-    void friendRequestSent(QByteArray username);
-    void friendDeleted(QByteArray username);
-    void userBlocked(QByteArray username);
-    void userUnblocked(QByteArray username);
+    void friendAdded(QString username);
+    void userNotFound(QString username);
+    void friendRequestSent(QString username);
+    void friendDeleted(QString username);
+    void userBlocked(QString username);
+    void userUnblocked(QString username);
 
     void sendFailed();
     void snapSent();
@@ -86,13 +86,14 @@ private:
     QByteArray extension(MediaType type);
 
     QNetworkReply *sendRequest(QNetworkRequest sendRequest,
-                           QHttpMultiPart *data = 0,
-                           QNetworkAccessManager::Operation operation = QNetworkAccessManager::PostOperation);
+                           QList<QPair<QString, QString> > data = {},
+                           QNetworkAccessManager::Operation operation = QNetworkAccessManager::PostOperation,
+                           const QByteArray &file = QByteArray());
 
     QHttpPart createPart(const QString &key, const QString &value);
     QJsonObject parseJsonObject(const QByteArray &data);
     void storeFile(const QByteArray &data, const QString &filename);
-    void sendUploadedSnap(const QByteArray &id, const QList<QByteArray> &recipients, int time);
+    void sendUploadedSnap(const QString &id, const QList<QString> &recipients, int time);
 
     QByteArray m_token;
     QNetworkAccessManager m_accessManager;

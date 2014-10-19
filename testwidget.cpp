@@ -8,18 +8,28 @@
 #include <QJsonArray>
 #include <QFile>
 #include <QUuid>
+#include <QApplication>
+
+#include <QPushButton>
 
 #define SECRET "iEk21fuwZApXlz93750dmW22pw389dPwOk"
 
 #define BLOBKEY "M02cnQ51Ji97vwT4"
 
-#define BASE_URL QStringLiteral("https://feelinsonice-hrd.appspot.com/bq/")
+//#define BASE_URL QStringLiteral("https://feelinsonice-hrd.appspot.com/bq/")
+#define BASE_URL QStringLiteral("http://localhost:8080/")
 
 TestWidget::TestWidget(QWidget *parent) :
     QWidget(parent),
     m_token("m198sOkJEn37DjqZ32lpRu76xmw288xSQ9"),
     m_outputPath("/home/sandsmark/tmp/")
 {
+    login("fuckIngHell", "f0uckplz");
+
+    QPushButton *button = new QPushButton("QUIT", this);
+    button->setFocus();
+    button->setDefault(true);
+    connect(button, SIGNAL(clicked()), qApp, SLOT(quit()));
 }
 
 void TestWidget::login(QString username, QString password)
@@ -28,8 +38,8 @@ void TestWidget::login(QString username, QString password)
 
     QNetworkRequest request(BASE_URL + "login");
 
-    QHttpMultiPart *data = new QHttpMultiPart;
-    data->append(createPart("password", password));
+    QList<QPair<QString, QString>> data;
+    data.append(qMakePair(QStringLiteral("password"), password));
 
     QNetworkReply *reply = sendRequest(request, data);
     QObject::connect(reply, &QNetworkReply::finished, [=]() {
@@ -67,8 +77,8 @@ void TestWidget::getUpdates(qulonglong timelimit)
 {
     QNetworkRequest request(BASE_URL + "updates");
 
-    QHttpMultiPart *data = new QHttpMultiPart;
-    data->append(createPart("update_timestamp", QByteArray::number(timelimit)));
+    QList<QPair<QString, QString>> data;
+    data.append(qMakePair(QStringLiteral("update_timestamp"), QString::number(timelimit)));
 
     QNetworkReply *reply = sendRequest(request, data);
     QObject::connect(reply, &QNetworkReply::finished, [=]() {
@@ -80,8 +90,8 @@ void TestWidget::getStories(qulonglong timelimit)
 {
     QNetworkRequest request(BASE_URL + "all_updates");
 
-    QHttpMultiPart *data = new QHttpMultiPart;
-    data->append(createPart("update_timestamp", QByteArray::number(timelimit)));
+    QList<QPair<QString, QString>> data;
+    data.append(qMakePair(QStringLiteral("update_timestamp"), QString::number(timelimit)));
 
     QNetworkReply *reply = sendRequest(request, data);
     QObject::connect(reply, &QNetworkReply::finished, [=]() {
@@ -96,12 +106,13 @@ void TestWidget::getStories(qulonglong timelimit)
     });
 }
 
-void TestWidget::getStoryBlob(const QByteArray &id, const QByteArray &key, const QByteArray &iv)
+void TestWidget::getStoryBlob(const QString &id, const QByteArray &key, const QByteArray &iv)
 {
     QNetworkRequest request(BASE_URL + "story_blob");
 
-    QHttpMultiPart *data = new QHttpMultiPart;
-    data->append(createPart("story_id", id));
+    QList<QPair<QString, QString>> data;
+    data.append(qMakePair(QStringLiteral("story_id"), id));
+
 
     QNetworkReply *reply = sendRequest(request, data, QNetworkAccessManager::GetOperation);
     QObject::connect(reply, &QNetworkReply::finished, [=]() {
@@ -115,8 +126,8 @@ void TestWidget::getSnap(const QByteArray &id)
 {
     QNetworkRequest request(BASE_URL + "blob");
 
-    QHttpMultiPart *data = new QHttpMultiPart;
-    data->append(createPart("id", id));
+    QList<QPair<QString, QString>> data;
+    data.append(qMakePair(QStringLiteral("id"), id));
 
     QNetworkReply *reply = sendRequest(request, data);
     QObject::connect(reply, &QNetworkReply::finished, [=]() {
@@ -150,9 +161,9 @@ void TestWidget::markViewed(const QByteArray &id, int duration)
         events.append(expiredObject);
     }
 
-    QHttpMultiPart *data = new QHttpMultiPart;
-    data->append(createPart("id", id));
-    data->append(createPart("events", QJsonDocument(events).toJson()));
+    QList<QPair<QString, QString>> data;
+    data.append(qMakePair(QStringLiteral("id"), id));
+    data.append(qMakePair(QStringLiteral("events"), QJsonDocument(events).toJson()));
 
     QNetworkReply *reply = sendRequest(request, data);
     QObject::connect(reply, &QNetworkReply::finished, [=]() {
@@ -169,9 +180,9 @@ void TestWidget::setPrivacy(TestWidget::Privacy privacy)
 {
     QNetworkRequest request(BASE_URL + "settings");
 
-    QHttpMultiPart *data = new QHttpMultiPart;
-    data->append(createPart("action", "updatePrivacy"));
-    data->append(createPart("privacySetting", QByteArray::number(privacy)));
+    QList<QPair<QString, QString>> data;
+    data.append(qMakePair(QStringLiteral("action"), QStringLiteral("updatePrivacy")));
+    data.append(qMakePair(QStringLiteral("privacySetting"), QString::number(privacy)));
 
     QNetworkReply *reply = sendRequest(request, data);
     QObject::connect(reply, &QNetworkReply::finished, [=]() {
@@ -189,7 +200,7 @@ void TestWidget::setPrivacy(TestWidget::Privacy privacy)
 
 }
 
-void TestWidget::changeRelationship(const QByteArray &username, UserAction userAction)
+void TestWidget::changeRelationship(const QString &username, UserAction userAction)
 {
     QNetworkRequest request(BASE_URL + "friend");
 
@@ -211,9 +222,9 @@ void TestWidget::changeRelationship(const QByteArray &username, UserAction userA
         break;
     }
 
-    QHttpMultiPart *data = new QHttpMultiPart;
-    data->append(createPart("action", "add"));
-    data->append(createPart("friend", username));
+    QList<QPair<QString, QString>> data;
+    data.append(qMakePair(QStringLiteral("action"), QStringLiteral("add")));
+    data.append(qMakePair(QStringLiteral("friend"), username));
 
     QNetworkReply *reply = sendRequest(request, data);
     QObject::connect(reply, &QNetworkReply::finished, [=]() {
@@ -252,38 +263,16 @@ void TestWidget::changeRelationship(const QByteArray &username, UserAction userA
     });
 }
 
-void TestWidget::sendSnap(const QByteArray &fileData, QList<QByteArray> recipients, int time)
+void TestWidget::sendSnap(const QByteArray &fileData, QList<QString> recipients, int time)
 {
-    int mediaType;
-    QString mimetype;
-
-    if (isImage(fileData)) {
-        mediaType = Image;
-        mimetype = "image/jpeg";
-    } else if (isVideo(fileData)) {
-        mediaType = Video;
-        mimetype = "video/mp4";
-    } else {
-        qWarning() << "trying to send invalid data";
-        emit sendFailed();
-        return;
-    }
-
-    QByteArray mediaId = m_username.toUpper().toUtf8() + "~" + QUuid::createUuid().toString().toLatin1();
+    QString mediaId = m_username.toUpper() + "~" + QUuid::createUuid().toString();
 
     QNetworkRequest request(BASE_URL + "upload");
 
-    QHttpMultiPart *data = new QHttpMultiPart;
-    data->append(createPart("type", QByteArray::number(mediaType)));
-    data->append(createPart("media_id", mediaId));
+    QList<QPair<QString, QString>> data;
+    data.append(qMakePair(QStringLiteral("media_id"), mediaId));
 
-    QHttpPart filepart;
-    filepart.setHeader(QNetworkRequest::ContentTypeHeader, QVariant(mimetype));
-    filepart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"data\""));
-    filepart.setBody(encode(fileData));
-    data->append(filepart);
-
-    QNetworkReply *reply = sendRequest(request, data);
+    QNetworkReply *reply = sendRequest(request, data, QNetworkAccessManager::PostOperation, fileData);
     QObject::connect(reply, &QNetworkReply::finished, [=]() {
         QByteArray response = reply->readAll();
         if (!response.isEmpty()) {
@@ -291,6 +280,34 @@ void TestWidget::sendSnap(const QByteArray &fileData, QList<QByteArray> recipien
             return;
         }
         sendUploadedSnap(mediaId, recipients, time);
+    });
+}
+
+
+void TestWidget::sendUploadedSnap(const QString &id, const QList<QString> &recipients, int time)
+{
+    QNetworkRequest request(BASE_URL + "send");
+
+    QStringList recipientStrings;
+    foreach(const QString &recipient, recipients) {
+        recipientStrings.append(recipient);
+    }
+
+
+    QList<QPair<QString, QString>> data;
+    data.append(qMakePair(QStringLiteral("media_id"), id));
+    data.append(qMakePair(QStringLiteral("recipients"), recipientStrings.join(",")));
+    data.append(qMakePair(QStringLiteral("time"), QByteArray::number(time)));
+    data.append(qMakePair(QStringLiteral("zipped"), QStringLiteral("0")));
+
+    QNetworkReply *reply = sendRequest(request, data);
+    QObject::connect(reply, &QNetworkReply::finished, [=]() {
+        QByteArray response = reply->readAll();
+        if (!response.isEmpty()) {
+            qWarning() << "failed to send uploaded snap" << response;
+        }
+
+        emit snapSent();
     });
 }
 
@@ -353,32 +370,76 @@ QByteArray TestWidget::extension(TestWidget::MediaType type)
     return "";
 }
 
-QNetworkReply *TestWidget::sendRequest(QNetworkRequest request, QHttpMultiPart *data, QNetworkAccessManager::Operation operation)
+QNetworkReply *TestWidget::sendRequest(QNetworkRequest request, QList<QPair<QString, QString> > data, QNetworkAccessManager::Operation operation, const QByteArray &fileData)
 {
-    QByteArray timestamp = QByteArray::number(QDateTime::currentMSecsSinceEpoch());
+    QByteArray timestamp = QByteArray::number(0);//QDateTime::currentMSecsSinceEpoch());
 
     request.setHeader(QNetworkRequest::UserAgentHeader, "Snapchat/6.1.2 (iPhone6,2; iOS 7.0.4; gzip)");
 
     QByteArray token = requestToken(m_token, timestamp);
 
+    data.append(qMakePair(QStringLiteral("timestamp"), timestamp));
+    data.append(qMakePair(QStringLiteral("req_token"), token));
+    data.append(qMakePair(QStringLiteral("username"), m_username));
+
     QNetworkReply *reply = 0;
     if (operation == QNetworkAccessManager::PostOperation) {
-        if (!data) {
-            data = new QHttpMultiPart;
-            data->setContentType(QHttpMultiPart::FormDataType);
+        if (fileData.isEmpty()) {
+            QByteArray body;
+            foreach (auto item, data) {
+                body.append(item.first.toUtf8().toPercentEncoding());
+                body.append("=");
+                body.append(item.second.toUtf8().toPercentEncoding());
+                body.append("&");
+            }
+            if (data.length() > 0) {
+                body.chop(1); // strip last &
+            }
+
+            request.setHeader(QNetworkRequest::ContentTypeHeader,"application/x-www-form-urlencoded");
+            reply = m_accessManager.post(request, body);
+        } else {
+            QString mimetype;
+            int mediaType;
+            if (isImage(fileData)) {
+                mediaType = Image;
+                mimetype = "image/jpeg";
+            } else if (isVideo(fileData)) {
+                mediaType = Video;
+                mimetype = "video/mp4";
+            } else {
+                qWarning() << "trying to send invalid data";
+                emit sendFailed();
+                return 0;
+            }
+            data.append(qMakePair(QStringLiteral("type"), QString::number(mediaType)));
+
+            QHttpMultiPart *multiPart = new QHttpMultiPart;
+            QHttpPart filepart;
+            filepart.setHeader(QNetworkRequest::ContentTypeHeader, QVariant(mimetype));
+            filepart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"data\""));
+            filepart.setBody(encode(fileData));
+            multiPart->append(filepart);
+
+            foreach (auto item, data) {
+                multiPart->append(createPart(item.first, item.second));
+            }
+
+            reply = m_accessManager.post(request, multiPart);
+            multiPart->setParent(reply);
         }
 
-        data->append(createPart("timestamp", timestamp));
-        data->append(createPart("req_token", token));
-        data->append(createPart("username", m_username));
-
-        reply = m_accessManager.post(request, data);
     } else if (operation == QNetworkAccessManager::GetOperation) {
         QUrl url = request.url();
 
         QUrlQuery query;
         query.addQueryItem("timestamp", timestamp);
         query.addQueryItem("req_token", token);
+
+        foreach(auto item, data) {
+            query.addQueryItem(item.first, item.second);
+        }
+
         url.setQuery(query);
 
         request.setUrl(url);
@@ -388,7 +449,6 @@ QNetworkReply *TestWidget::sendRequest(QNetworkRequest request, QHttpMultiPart *
         Q_ASSERT(0);
     }
 
-    data->setParent(reply);
     return reply;
 }
 
@@ -405,7 +465,7 @@ QJsonObject TestWidget::parseJsonObject(const QByteArray &data)
 {
     QJsonDocument result = QJsonDocument::fromJson(data);
     if (result.isNull()) {
-        qDebug() << "unable to parse result";
+        qDebug() << "unable to parse result: " << data;
         return QJsonObject();
     }
 
@@ -439,36 +499,10 @@ void TestWidget::storeFile(const QByteArray &data, const QString &filename)
     file.write(data);
 }
 
-void TestWidget::sendUploadedSnap(const QByteArray &id, const QList<QByteArray> &recipients, int time)
-{
-    QNetworkRequest request(BASE_URL + "send");
-
-    QStringList recipientStrings;
-    foreach(const QByteArray &recipient, recipients) {
-        recipientStrings.append(QString::fromUtf8(recipient));
-    }
-
-    QHttpMultiPart *data = new QHttpMultiPart;
-    data->append(createPart("media_id", id));
-    data->append(createPart("recipients", recipientStrings.join(",")));
-    data->append(createPart("time", QByteArray::number(time)));
-    data->append(createPart("zipped", "0"));
-
-    QNetworkReply *reply = sendRequest(request, data);
-    QObject::connect(reply, &QNetworkReply::finished, [=]() {
-        QByteArray response = reply->readAll();
-        if (!response.isEmpty()) {
-            qWarning() << "failed to send uploaded snap" << response;
-        }
-
-        emit snapSent();
-    });
-}
-
 QByteArray TestWidget::requestToken(QByteArray secA, QByteArray secB)
 {
-    QByteArray hashA = QCryptographicHash::hash(SECRET + secA, QCryptographicHash::Sha3_256).toHex();
-    QByteArray hashB = QCryptographicHash::hash(secB + SECRET, QCryptographicHash::Sha3_256).toHex();
+    QByteArray hashA = QCryptographicHash::hash(SECRET + secA, QCryptographicHash::Sha256).toHex();
+    QByteArray hashB = QCryptographicHash::hash(secB + SECRET, QCryptographicHash::Sha256).toHex();
 
     static int mergePattern[] = {0, 0, 0, 1,
                                  1, 1, 0, 1,
@@ -486,8 +520,9 @@ QByteArray TestWidget::requestToken(QByteArray secA, QByteArray secB)
                                  1, 1, 0, 0,
                                  0, 1, 0, 0,
                                  0, 1, 1, 0 };
+
     QByteArray res;
-    for (int i=0; i<16; i++) {
+    for (int i=0; i<64; i++) {
         if (mergePattern[i]) {
             res += hashB[i];
         } else {
