@@ -14,5 +14,5 @@ class Handler(BaseHTTPRequestHandler):
             print(header)
         print("body: " + str(self.rfile.read(int(self.headers.get('content-length')))))
 
-serber = HTTPServer(('127.0.0.1', 8080), Handler)
+serber = HTTPServer(('127.0.0.1', 1234), Handler)
 serber.serve_forever(0.5)

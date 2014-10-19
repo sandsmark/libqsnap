@@ -16,8 +16,8 @@
 
 #define BLOBKEY "M02cnQ51Ji97vwT4"
 
-//#define BASE_URL QStringLiteral("https://feelinsonice-hrd.appspot.com/bq/")
-#define BASE_URL QStringLiteral("http://localhost:8080/")
+#define BASE_URL QStringLiteral("https://feelinsonice-hrd.appspot.com/bq/")
+//#define BASE_URL QStringLiteral("http://localhost:8080/")
 
 TestWidget::TestWidget(QWidget *parent) :
     QWidget(parent),
@@ -30,6 +30,11 @@ TestWidget::TestWidget(QWidget *parent) :
     button->setFocus();
     button->setDefault(true);
     connect(button, SIGNAL(clicked()), qApp, SLOT(quit()));
+
+    connect(this, &TestWidget::loggedIn, [=] () {
+       qDebug() << "logged in :D";
+       getUpdates();
+    });
 }
 
 void TestWidget::login(QString username, QString password)
@@ -43,13 +48,16 @@ void TestWidget::login(QString username, QString password)
 
     QNetworkReply *reply = sendRequest(request, data);
     QObject::connect(reply, &QNetworkReply::finished, [=]() {
-        QJsonObject object = parseJsonObject(reply->readAll());
+        QByteArray result = reply->readAll();
+        QJsonObject object = parseJsonObject(result);
         if (!object.contains("auth_token")) {
-            qDebug() << "no auth token in result";
+            // no auth token in result "{"message":"Dette er ikke riktig passord. Beklager!","status":-100,"logged":false}"
+            qDebug() << "no auth token in result" << result;
             emit loginFailed();
             return;
         }
         m_token = object["auth_token"].toString().toLatin1();
+        emit loggedIn();
 
         if (!object.contains("username")) {
             qDebug() << "no username in result";
@@ -82,7 +90,23 @@ void TestWidget::getUpdates(qulonglong timelimit)
 
     QNetworkReply *reply = sendRequest(request, data);
     QObject::connect(reply, &QNetworkReply::finished, [=]() {
-        qDebug() << "--- got update ---\n"<< reply->readAll() << "\n---";
+        QByteArray result = reply->readAll();
+        qDebug() << "--- got update ---\n"<< result << "\n---";
+        QJsonObject updatesObject = parseJsonObject(result);
+        QJsonArray snaps = updatesObject["snaps"].toArray();
+        if (snaps.isEmpty()) {
+            qWarning() << "no snaps";
+            return;
+        }
+
+        foreach(QJsonValue snap, snaps) {
+            if (!snap.toObject()["c_id"].toString().isEmpty()) {
+                //qDebug() << "no id" << snap;
+                continue;
+            }
+            QString mediaId = snap.toObject()["id"].toString();
+            getSnap(mediaId);
+        }
     });
 }
 
@@ -122,8 +146,9 @@ void TestWidget::getStoryBlob(const QString &id, const QByteArray &key, const QB
     });
 }
 
-void TestWidget::getSnap(const QByteArray &id)
+void TestWidget::getSnap(const QString &id)
 {
+    qDebug() << "getting snap" << id;
     QNetworkRequest request(BASE_URL + "blob");
 
     QList<QPair<QString, QString>> data;
@@ -131,7 +156,15 @@ void TestWidget::getSnap(const QByteArray &id)
 
     QNetworkReply *reply = sendRequest(request, data);
     QObject::connect(reply, &QNetworkReply::finished, [=]() {
-        storeFile(decode(reply->readAll()), "snap_" + id);
+        QByteArray result = reply->readAll();
+        QByteArray decoded = decode(result);
+        if (isValid(decoded)) {
+            storeFile(decoded, "snap_" + id);
+        } else if (isValid(result)) {
+            storeFile(result, "publicsnap_" + id);
+        } else {
+            qDebug() << "weird result:" << result.left(10).toHex() << "id:" << id;
+        }
 
         emit storedSnap(id);
     });
@@ -313,9 +346,9 @@ void TestWidget::sendUploadedSnap(const QString &id, const QList<QString> &recip
 
 QByteArray TestWidget::pad(QByteArray data, int blocksize)
 {
-    int padCount = blocksize - data.length() % blocksize;
+    int padCount = blocksize - (data.length() % blocksize);
     for (int i=0; i < padCount; i++) {
-        data += padCount;
+        data += char(padCount);
     }
     return data;
 }
@@ -326,10 +359,12 @@ QByteArray TestWidget::decode(QByteArray data)
 //    return cipher.decrypt(pkcs5_pad(data))
     QCA::Cipher cipher(QStringLiteral("aes128"),
                        QCA::Cipher::ECB,
-                       QCA::Cipher::DefaultPadding,
+                       QCA::Cipher::NoPadding,
                        QCA::Decode,
                        QCA::SymmetricKey(QByteArray(BLOBKEY)));
-    return cipher.process(data).toByteArray();
+    QByteArray ret = cipher.process(pad(data)).toByteArray();
+
+    return ret;
 }
 
 QByteArray TestWidget::decodeStory(QByteArray data, QByteArray key, QByteArray iv)
@@ -372,7 +407,7 @@ QByteArray TestWidget::extension(TestWidget::MediaType type)
 
 QNetworkReply *TestWidget::sendRequest(QNetworkRequest request, QList<QPair<QString, QString> > data, QNetworkAccessManager::Operation operation, const QByteArray &fileData)
 {
-    QByteArray timestamp = QByteArray::number(0);//QDateTime::currentMSecsSinceEpoch());
+    QByteArray timestamp = QByteArray::number(QDateTime::currentMSecsSinceEpoch());
 
     request.setHeader(QNetworkRequest::UserAgentHeader, "Snapchat/6.1.2 (iPhone6,2; iOS 7.0.4; gzip)");
 
@@ -497,6 +532,7 @@ void TestWidget::storeFile(const QByteArray &data, const QString &filename)
     }
 
     file.write(data);
+    file.close();
 }
 
 QByteArray TestWidget::requestToken(QByteArray secA, QByteArray secB)

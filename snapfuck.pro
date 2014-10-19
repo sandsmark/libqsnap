@@ -4,9 +4,9 @@
 
 TEMPLATE = app
 TARGET = snapfuck
-INCLUDEPATH += /usr/include/QtCrypto
+INCLUDEPATH += /usr/include/qt/QtCrypto/
 
-LIBS += -lqca
+LIBS += -lqca-qt5
 
 QT+= widgets network
 

@@ -34,6 +34,10 @@ class TestWidget : public QWidget
         UnblockUser
     };
 
+    struct Snap {
+        QString id;
+    };
+
 public:
     explicit TestWidget(QWidget *parent = 0);
 
@@ -42,7 +46,7 @@ public:
     void getUpdates(qulonglong timelimit = 0);
     void getStories(qulonglong timelimit = 0);
     void getStoryBlob(const QString &id, const QByteArray &key, const QByteArray &iv);
-    void getSnap(const QByteArray &id);
+    void getSnap(const QString &id);
     void markViewed(const QByteArray &id, int duration = 1);
     void setPrivacy(Privacy privacy);
     void changeRelationship(const QString &username, UserAction userAction);
@@ -50,6 +54,7 @@ public:
 
 signals:
     void loginFailed();
+    void loggedIn();
     void logoutFailed();
 
     void writeFileFailed();
@@ -82,6 +87,7 @@ private:
     static inline bool isVideo(const QByteArray &data) { return (data.length() > 2 && data[0] == 0 && data[1] == 0); }
     static inline bool isImage(const QByteArray &data) { return (data.length() > 2 && data[0] == '\xFF' && data[1] == '\xD8'); }
     static inline bool isZip(const QByteArray &data) { return (data.length() > 2 && data[0] == 'P' && data[1] == 'K'); }
+    static inline bool isValid(const QByteArray &data) { return isVideo(data) || isImage(data) || isZip(data); }
 
     QByteArray extension(MediaType type);
 
