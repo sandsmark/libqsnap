@@ -79,10 +79,10 @@ private:
 
     QByteArray requestToken(QByteArray secA, QByteArray secB);
 
-    QByteArray decode(QByteArray data);
-    QByteArray decodeStory(QByteArray data, QByteArray key, QByteArray iv);
+    QByteArray decode(QByteArray inputData);
+    QByteArray decodeStory(QByteArray input, QByteArray key, QByteArray iv);
 
-    QByteArray encode(QByteArray data);
+    QByteArray encode(QByteArray inputData);
 
     static inline bool isVideo(const QByteArray &data) { return (data.length() > 2 && data[0] == 0 && data[1] == 0); }
     static inline bool isImage(const QByteArray &data) { return (data.length() > 2 && data[0] == '\xFF' && data[1] == '\xD8'); }

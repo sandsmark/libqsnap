@@ -4,9 +4,6 @@
 
 TEMPLATE = app
 TARGET = snapfuck
-INCLUDEPATH += /usr/include/qt/QtCrypto/
-
-LIBS += -lqca-qt5
 
 QT+= widgets network
 
@@ -15,7 +12,6 @@ QMAKE_CXXFLAGS += -std=c++11
 
 
 # Input
-HEADERS += oaes_common.h oaes_lib.h oaes_config.h \
+HEADERS += aes.h \
     testwidget.h
-SOURCES += oaes_lib.c main.cpp \
-    testwidget.cpp
+SOURCES += main.cpp testwidget.cpp aes.c

@@ -1,6 +1,5 @@
 #include "testwidget.h"
 #include <QCryptographicHash>
-#include <QtCrypto>
 #include <QHttpMultiPart>
 #include <QUrlQuery>
 #include <QJsonDocument>
@@ -11,6 +10,10 @@
 #include <QApplication>
 
 #include <QPushButton>
+
+extern "C" {
+#include "aes.h"
+}
 
 #define SECRET "iEk21fuwZApXlz93750dmW22pw389dPwOk"
 
@@ -156,6 +159,11 @@ void TestWidget::getSnap(const QString &id)
 
     QNetworkReply *reply = sendRequest(request, data);
     QObject::connect(reply, &QNetworkReply::finished, [=]() {
+        if (reply->error() != QNetworkReply::NoError) {
+            qWarning() << "error while getting snap:" << reply->errorString();
+            return;
+        }
+
         QByteArray result = reply->readAll();
         QByteArray decoded = decode(result);
         if (isValid(decoded)) {
@@ -353,44 +361,63 @@ QByteArray TestWidget::pad(QByteArray data, int blocksize)
     return data;
 }
 
-QByteArray TestWidget::decode(QByteArray data)
+QByteArray TestWidget::decode(QByteArray inputData)
 {
-//    cipher = AES.new(BLOB_ENCRYPTION_KEY, AES.MODE_ECB)
-//    return cipher.decrypt(pkcs5_pad(data))
-    QCA::Cipher cipher(QStringLiteral("aes128"),
-                       QCA::Cipher::ECB,
-                       QCA::Cipher::NoPadding,
-                       QCA::Decode,
-                       QCA::SymmetricKey(QByteArray(BLOBKEY)));
-    QByteArray ret = cipher.process(pad(data)).toByteArray();
+    if (inputData.length() % 16) {
+        qWarning() << "encoded data not a multiple of 16";
+        return inputData;
+    }
+
+    // ECB, by hand, because everything else sucks
+    QByteArray ret(inputData.length(), '\0');
+    aes_context ctx;
+    aes_set_key(&ctx, (uint8*)BLOBKEY, 128);
+    char *decodedBuffer = ret.data();
+    for (int i=0; i<inputData.length(); i+=16) {
+        aes_decrypt(&ctx, (unsigned char*)inputData.constData() + i, (unsigned char*)decodedBuffer + i);
+    }
 
     return ret;
 }
 
-QByteArray TestWidget::decodeStory(QByteArray data, QByteArray key, QByteArray iv)
+QByteArray TestWidget::decodeStory(QByteArray input, QByteArray key, QByteArray iv)
 {
-    //cipher = AES.new(key, AES.MODE_CBC, iv)
-    //return cipher.decrypt(pkcs5_pad(data))
-    QCA::Cipher cipher(QStringLiteral("aes128"),
-                       QCA::Cipher::CBC,
-                       QCA::Cipher::DefaultPadding,
-                       QCA::Decode,
-                       QCA::SymmetricKey(key),
-                       QCA::InitializationVector(iv));
-    return cipher.process(data).toByteArray();
+    if (input.length() % 16) {
+        qWarning() << "encoded data not a multiple of 16";
+        return input;
+    }
+
+    // CBC, by hand, because everything else sucks
+    QByteArray ret;
+    aes_context ctx;
+    aes_set_key(&ctx, (uint8*)BLOBKEY, 128);
+    char *inputBuffer = input.data();
+    char *ivBuffer = iv.data();
+    for (int i=0; i<input.length() / 16; i++) {
+        for (int j=0; j<16; j++) {
+            inputBuffer[i + j] ^= ivBuffer[j];
+        }
+        aes_decrypt(&ctx, (unsigned char*)input.data() + (i * 16), (unsigned char*)ivBuffer);
+        ret += QByteArray::fromRawData(ivBuffer, 16);
+    }
+
+    return ret;
 }
 
-QByteArray TestWidget::encode(QByteArray data)
+QByteArray TestWidget::encode(QByteArray inputData)
 {
-    //cipher = AES.new(BLOB_ENCRYPTION_KEY, AES.MODE_ECB)
-    //return cipher.encrypt(pkcs5_pad(data))
+    inputData = pad(inputData);
 
-    QCA::Cipher cipher(QStringLiteral("aes128"),
-                       QCA::Cipher::ECB,
-                       QCA::Cipher::DefaultPadding,
-                       QCA::Encode,
-                       QCA::SymmetricKey(QByteArray(BLOBKEY)));
-    return cipher.process(data).toByteArray();
+    // ECB, by hand, because everything else sucks
+    QByteArray ret(inputData.length(), '\0');
+    char *encodedBuffer = ret.data();
+    aes_context ctx;
+    aes_set_key(&ctx, (uint8*)BLOBKEY, 128);
+    for (int i=0; i<inputData.length(); i+=16) {
+        aes_encrypt(&ctx, (unsigned char*)inputData.constData() + i, (unsigned char*)encodedBuffer + i);
+    }
+
+    return ret;
 }
 
 QByteArray TestWidget::extension(TestWidget::MediaType type)
@@ -513,6 +540,9 @@ QJsonObject TestWidget::parseJsonObject(const QByteArray &data)
 
 void TestWidget::storeFile(const QByteArray &data, const QString &filename)
 {
+    qDebug() << "writing" << data.length() / (1024.0 * 1024.0) << "MB to" << filename;
+    Q_ASSERT(data.length() < 1024 * 1024 * 10);
+
     QString extension;
     if (isVideo(data)) {
         extension = ".mp4";
